@@ -52,6 +52,20 @@ Trigger it by asking, in whatever words fit:
 
 You can also tell Claude a ceiling up front ("stay under 90% this week", "spend at most 500k tokens on this") and it will size the work to fit and reach harbor on its own before the cap.
 
+## Make it fire reliably
+
+Installing the skill gives Claude the procedure. It does not make Claude run it on its own. Two steps close that gap:
+
+1. **Turn it into a standing instruction.** Add a line to your `CLAUDE.md` (global or per-project):
+
+   > Always run the safe-harbor skill when wrapping up a session or approaching a usage, token, or budget limit.
+
+   That moves the skill from "available if asked" to "runs by default".
+
+2. **Give it a trigger it can act on.** The skill cannot read your live usage, so hand it a ceiling at the start of expensive work: "stay under 90% this week", or "spend at most 500k tokens on this". Claude sizes the work to fit and reaches harbor before the cap.
+
+For a mechanical backstop at session end, you can also wire a `Stop` hook that commits and pushes any dangling work. That is optional; the `CLAUDE.md` line plus a budget covers the common case.
+
 ## Why it is not fully automatic
 
 A skill cannot watch your usage and pull the plug by itself. It is not a background process, and the weekly quota lives on the server with no reliable live read from inside a session. So `safe-harbor` runs on your signal or on a budget you set, not on a percentage watchdog. Paired with checkpoint-safe work, where a cutoff is nearly free anyway, it reaches the same result without depending on a watchdog that cannot exist.

@@ -52,6 +52,20 @@ Actívala pidiéndolo, con las palabras que te salgan:
 
 También puedes darle un tope por adelantado ("quédate por debajo del 90% esta semana", "gástate como mucho 500k tokens en esto") y dimensionará el trabajo para caber y llegar a puerto sola antes del tope.
 
+## Cómo hacer que se dispare de verdad
+
+Instalar la skill le da a Claude el procedimiento. No hace que lo ejecute solo. Dos pasos cierran ese hueco:
+
+1. **Conviértela en instrucción permanente.** Añade una línea a tu `CLAUDE.md` (global o por proyecto):
+
+   > Ejecuta siempre la skill safe-harbor al cerrar una sesión o al acercarte a un límite de uso, tokens o presupuesto.
+
+   Eso la pasa de "disponible si la pides" a "se ejecuta por defecto".
+
+2. **Dale un disparador con el que pueda actuar.** La skill no puede leer tu consumo en vivo, así que dale un tope al empezar el trabajo caro: "quédate por debajo del 90% esta semana" o "gástate como mucho 500k tokens en esto". Claude dimensiona el trabajo para caber y llega a puerto antes del tope.
+
+Como red de seguridad mecánica al terminar la sesión, también puedes montar un hook `Stop` que haga commit y push de lo que quede suelto. Es opcional; la línea en `CLAUDE.md` más un presupuesto cubren el caso común.
+
 ## Por qué no es totalmente automática
 
 Una skill no puede vigilar tu consumo y cortar la corriente sola. No es un proceso en segundo plano, y la cuota semanal vive en el servidor sin una lectura fiable en vivo desde dentro de una sesión. Así que `safe-harbor` se dispara con tu señal o con un presupuesto que tú marcas, no con un vigilante de porcentaje. Junto con un trabajo que va guardándose sobre la marcha, donde un corte casi no cuesta nada, llegas al mismo resultado sin depender de un vigilante que no puede existir.
