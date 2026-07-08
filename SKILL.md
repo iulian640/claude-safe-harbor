@@ -49,18 +49,18 @@ Two halves, both needed:
 
 ## Estimating your usage (optional helper)
 
-`scripts/usage.py` estimates how close you are to each of your Claude limits, so the skill can self-trigger instead of waiting for you to notice. Claude enforces several limits at once, so the tool tracks each meter separately, anchored to its real reset time, and trips on whichever is closest to its cap:
+`scripts/usage.py` estimates how close you are to each of your Claude limits, so the skill can self-trigger instead of waiting for you to notice. Claude enforces several limits at once, so the tool tracks each meter separately and trips on whichever is closest to its cap:
 
-- the current **session** window (~5 hours), the one that bites during bursts of work,
-- the **weekly** window across all models.
+- the **session** window (~5 hours). It is not a fixed clock reset: it starts with the first message you send after the previous window expired, and runs 5h from there. The tool reconstructs that window from your transcript timestamps, so you never have to tell it when the window started.
+- the **weekly** window across all models, anchored to a fixed reset you give it once.
 
 It sums the token usage in your local Claude Code transcripts (`~/.claude/projects/**/*.jsonl`, sub-agent runs included), weights it by model, and scales each meter against a calibration you take from the real `/usage` reading.
 
-- `python scripts/usage.py set-reset session <iso>` and `... set-reset week <iso>` once, with the reset times `/usage` shows (e.g. `2026-07-09T00:50+02:00`). This anchors each window instead of guessing.
+- `python scripts/usage.py set-reset week <iso>` once, with the weekly reset `/usage` shows (e.g. `2026-07-12T02:00+02:00`). The session window needs no reset; it is computed from your timestamps.
 - `python scripts/usage.py calibrate session <pct>` and `... calibrate week <pct>`, with the percents `/usage` shows right now. This fixes each meter's scale.
 - `python scripts/usage.py estimate` any time after. It prints each meter's estimated percent and exits non-zero once any crosses the trigger, which is the cue to run the wrap-up procedure above.
 
-It only sees this machine's Claude Code usage, and the exact weighting toward each limit is not public, so the numbers are a conservative early warning, not a precise gauge. The session meter's window floats, so re-anchor and re-calibrate it at the start of a work session. (The token counting itself is exact: it matches Claude Code's own `stats-cache.json` to the token.)
+It only sees this machine's Claude Code usage, and the exact weighting toward each limit is not public, so the numbers are a conservative early warning, not a precise gauge. Re-calibrate at the start of a work session. (The token counting itself is exact: it matches Claude Code's own `stats-cache.json` to the token.)
 
 ## Why not fully automatic
 
