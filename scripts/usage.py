@@ -1,27 +1,34 @@
 #!/usr/bin/env python3
-"""safe-harbor usage estimator.
+"""safe-harbor usage estimator (multi-meter, reset-anchored).
 
-Estimates how much of your weekly Claude subscription quota you have burned,
-from inside a session, by summing the token usage recorded in your local
-Claude Code transcripts and comparing it against a figure you calibrate from
+Estimates how close you are to each of your Claude subscription limits, from
+inside a session, by summing the token usage recorded in your local Claude
+Code transcripts and scaling each meter against a figure you calibrate from
 the real `/usage` reading.
 
-It is an ESTIMATE, not a fuel gauge. It only sees Claude Code usage on this
-machine (not claude.ai web, the API, or other devices), and the exact
-weighting Anthropic applies toward the weekly limit is not public, so the
-scale is fixed by calibration. Treat it as a conservative early warning:
-trigger the safe-harbor wrap-up around the margin you set, not at the exact
-number.
+Claude enforces SEVERAL limits at once, each resetting at its own time:
+  - the current SESSION window (~5 hours) — the one that bites during bursts,
+  - the weekly window across all models,
+  - a weekly cap for premium models (e.g. Fable) with its own ceiling.
+safe-harbor trips on whichever meter is closest to its cap, so this tool tracks
+each separately, anchored to its real reset time, and reports them side by side.
+
+It is an ESTIMATE. It only sees Claude Code usage on this machine (not
+claude.ai web, the API, or other devices), and the exact weighting Anthropic
+applies toward each limit is not public, so each meter's scale is fixed by its
+own calibration. Treat the numbers as a conservative early warning, and
+re-calibrate (especially the session meter) when `/usage` drifts from them.
 
 Commands:
-  scan                  Sum weighted tokens over the rolling window, by model.
-  calibrate <percent>   Record "right now /usage says <percent>%" and derive
-                        the tokens->percent factor.
-  estimate              Print the estimated weekly-usage percent (needs a
-                        calibration first). Exit code 2 if over the trigger.
-  (no arg)              estimate if calibrated, else scan.
+  scan                       Weighted tokens per meter (and by model).
+  set-reset <meter> <iso>    Anchor a meter's window to its real reset time
+                             (from `/usage`), e.g. set-reset session 2026-07-09T00:50+02:00
+  calibrate <meter> <pct>    Record "right now /usage shows <pct>% for <meter>".
+  estimate                   Print every calibrated meter; exit 2 if any is over
+                             its trigger.
+  (no arg)                   estimate if calibrated, else scan.
 
-Config lives in ~/.claude/safe-harbor.json.
+Config: ~/.claude/safe-harbor.json
 """
 import sys
 import json
@@ -35,28 +42,18 @@ CONFIG = os.path.join(HOME, ".claude", "safe-harbor.json")
 
 DEFAULTS = {
     "plan": "unknown",
-    "window_days": 7,
     "trigger_percent": 85.0,
-    # Per-token component weights. Output is the expensive part; cache reads are
-    # cheap. These are proxies; calibration absorbs the overall scale, so only
-    # the relative shape matters here.
-    "component_weights": {
-        "output": 5.0,
-        "input": 1.0,
-        "cache_creation": 1.25,
-        "cache_read": 0.1,
+    # Each meter: window length, its real reset time (ISO, from /usage; null = rolling),
+    # and scope ("all" or a model-family substring like "fable").
+    "meters": {
+        "session":    {"length_hours": 5,   "reset": None, "scope": "all"},
+        "week":       {"length_hours": 168, "reset": None, "scope": "all"},
+        "week:fable": {"length_hours": 168, "reset": None, "scope": "fable"},
     },
-    # Per-model weights toward the quota (heavier models burn faster). Matched
-    # by substring against the model id. Rough price-shaped proxies.
-    "model_weights": {
-        "opus": 5.0,
-        "fable": 5.0,
-        "mythos": 5.0,
-        "sonnet": 1.0,
-        "haiku": 0.25,
-        "default": 1.0,
-    },
-    "calibrations": [],  # list of {"at": iso, "reported_pct": float, "weighted": float}
+    "component_weights": {"output": 5.0, "input": 1.0, "cache_creation": 1.25, "cache_read": 0.1},
+    "model_weights": {"opus": 5.0, "fable": 5.0, "mythos": 5.0, "sonnet": 1.0, "haiku": 0.25, "default": 1.0},
+    # meter -> list of {"at": iso, "reported_pct": float, "weighted": float}
+    "calibrations": {},
 }
 
 
@@ -64,15 +61,44 @@ def load_config():
     cfg = dict(DEFAULTS)
     if os.path.exists(CONFIG):
         try:
-            saved = json.loads(open(CONFIG, encoding="utf-8").read())
-            cfg.update(saved)
+            cfg.update(json.loads(open(CONFIG, encoding="utf-8").read()))
         except Exception:
             pass
+    if isinstance(cfg.get("calibrations"), list):  # migrate v2.0 single-list form
+        cfg["calibrations"] = {"week": cfg["calibrations"]} if cfg["calibrations"] else {}
+    cfg.setdefault("meters", DEFAULTS["meters"])
     return cfg
 
 
 def save_config(cfg):
     open(CONFIG, "w", encoding="utf-8").write(json.dumps(cfg, indent=2, ensure_ascii=False))
+
+
+def parse_ts(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def meter_start(meter_cfg, now):
+    """Window start: anchored to the real reset if it's still in the future, else rolling."""
+    length = timedelta(hours=meter_cfg.get("length_hours", 5))
+    reset = parse_ts(meter_cfg.get("reset"))
+    stale = False
+    if reset is not None and reset > now:
+        start = reset - length
+    else:
+        start = now - length  # rolling fallback (no reset set, or it already passed)
+        stale = reset is not None
+    return start, stale
+
+
+def model_family(cfg, model):
+    m = (model or "").lower()
+    return next((k for k in cfg["model_weights"] if k != "default" and k in m), model or "unknown")
 
 
 def model_weight(cfg, model):
@@ -83,24 +109,16 @@ def model_weight(cfg, model):
     return cfg["model_weights"]["default"]
 
 
-def parse_ts(s):
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except Exception:
-        return None
-
-
 def scan(cfg):
-    """Sum weighted tokens over the rolling window, grouped by model family."""
+    """Return {meter: {"weighted": float, "stale": bool, "byfam": {fam: w}}}."""
     now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(days=cfg["window_days"])
     cw = cfg["component_weights"]
-    by_model = {}       # model family -> weighted tokens
-    raw_by_model = {}   # model family -> raw total tokens (unweighted)
-    files = glob.glob(os.path.join(PROJECTS, "**", "*.jsonl"), recursive=True)
-    for f in files:
+    meters = cfg["meters"]
+    starts = {name: meter_start(mc, now) for name, mc in meters.items()}
+    acc = {name: {"weighted": 0.0, "stale": starts[name][1], "byfam": {}} for name in meters}
+    nfiles = 0
+    for f in glob.glob(os.path.join(PROJECTS, "**", "*.jsonl"), recursive=True):
+        nfiles += 1
         try:
             fh = open(f, encoding="utf-8")
         except Exception:
@@ -119,65 +137,98 @@ def scan(cfg):
             if not isinstance(u, dict):
                 continue
             ts = parse_ts(e.get("timestamp"))
-            if ts is None or ts < cutoff:
+            if ts is None:
                 continue
             model = msg.get("model") or "unknown"
-            fam = next((k for k in cfg["model_weights"] if k != "default" and k in model.lower()), model)
+            fam = model_family(cfg, model)
             inp = u.get("input_tokens", 0) or 0
-            out = u.get("output_tokens", 0) or 0
+            o = u.get("output_tokens", 0) or 0
             cc = u.get("cache_creation_input_tokens", 0) or 0
             cr = u.get("cache_read_input_tokens", 0) or 0
             weighted = model_weight(cfg, model) * (
-                out * cw["output"] + inp * cw["input"] + cc * cw["cache_creation"] + cr * cw["cache_read"]
+                o * cw["output"] + inp * cw["input"] + cc * cw["cache_creation"] + cr * cw["cache_read"]
             )
-            by_model[fam] = by_model.get(fam, 0.0) + weighted
-            raw_by_model[fam] = raw_by_model.get(fam, 0) + inp + out + cc + cr
-    total = sum(by_model.values())
-    return total, by_model, raw_by_model, len(files)
+            for name, mc in meters.items():
+                start = starts[name][0]
+                if ts < start:
+                    continue
+                scope = mc.get("scope", "all")
+                if scope != "all" and scope not in (model or "").lower():
+                    continue
+                acc[name]["weighted"] += weighted
+                acc[name]["byfam"][fam] = acc[name]["byfam"].get(fam, 0.0) + weighted
+    return acc, nfiles
 
 
 def cmd_scan(cfg):
-    total, by_model, raw, nfiles = scan(cfg)
-    print(f"safe-harbor scan: rolling {cfg['window_days']}d, {nfiles} transcript files")
-    for fam in sorted(by_model, key=lambda k: -by_model[k]):
-        print(f"  {fam:12} weighted={by_model[fam]:>15,.0f}   raw={raw.get(fam,0):>15,}")
-    print(f"  {'TOTAL':12} weighted={total:>15,.0f}")
-    return total
+    acc, nfiles = scan(cfg)
+    print(f"safe-harbor scan: {nfiles} transcript files")
+    for name in cfg["meters"]:
+        a = acc[name]
+        tag = " (reset stale -> rolling)" if a["stale"] else ""
+        print(f"  {name:14} weighted = {a['weighted']:>15,.0f}{tag}")
+        for fam in sorted(a["byfam"], key=lambda k: -a["byfam"][k]):
+            if a["byfam"][fam] > 0 and cfg["meters"][name].get("scope", "all") == "all":
+                print(f"      {fam:10} {a['byfam'][fam]:>15,.0f}")
+    return 0
 
 
-def cmd_calibrate(cfg, percent):
-    total, _, _, _ = scan(cfg)
-    if total <= 0:
-        print("No usage found in the window; cannot calibrate.")
+def cmd_set_reset(cfg, meter, iso):
+    if meter not in cfg["meters"]:
+        print(f"Unknown meter '{meter}'. Known: {', '.join(cfg['meters'])}")
         return 1
-    cfg["calibrations"].append({
+    if parse_ts(iso) is None:
+        print(f"Bad ISO time '{iso}'. Example: 2026-07-09T00:50+02:00")
+        return 1
+    cfg["meters"][meter]["reset"] = iso
+    save_config(cfg)
+    print(f"{meter} reset anchored to {iso}.")
+    return 0
+
+
+def cmd_calibrate(cfg, meter, percent):
+    if meter not in cfg["meters"]:
+        print(f"Unknown meter '{meter}'. Known: {', '.join(cfg['meters'])}")
+        return 1
+    acc, _ = scan(cfg)
+    w = acc[meter]["weighted"]
+    if w <= 0:
+        print(f"No usage for '{meter}' in its window; cannot calibrate.")
+        return 1
+    cfg.setdefault("calibrations", {}).setdefault(meter, []).append({
         "at": datetime.now(timezone.utc).isoformat(),
         "reported_pct": float(percent),
-        "weighted": total,
+        "weighted": w,
     })
     save_config(cfg)
-    factor = float(percent) / total
-    print(f"Calibrated: {percent}% == {total:,.0f} weighted tokens (factor {factor:.3e} %/token).")
-    print("From now on `estimate` uses this. Re-calibrate when your usage mix shifts.")
+    print(f"Calibrated {meter}: {percent}% == {w:,.0f} weighted tokens.")
     return 0
 
 
 def cmd_estimate(cfg):
-    if not cfg["calibrations"]:
-        print("Not calibrated yet. Run: usage.py calibrate <the % that /usage shows right now>")
+    cals = cfg.get("calibrations") or {}
+    if not cals:
+        print("Not calibrated. Run `scan`, then e.g.: calibrate session 69 / calibrate week 87")
         return 1
-    cal = cfg["calibrations"][-1]
-    total, by_model, _, _ = scan(cfg)
-    factor = cal["reported_pct"] / cal["weighted"] if cal["weighted"] else 0
-    est = total * factor
+    acc, _ = scan(cfg)
     trig = cfg["trigger_percent"]
-    mix = ", ".join(f"{k} {100*v/total:.0f}%" for k, v in sorted(by_model.items(), key=lambda x: -x[1])) if total else "n/a"
-    print(f"safe-harbor estimate: ~{est:.0f}% of weekly quota used (trigger at {trig}%).")
-    print(f"  calibrated {cal['at'][:16]} at {cal['reported_pct']}%; window {cfg['window_days']}d; mix: {mix}")
-    if est >= trig:
-        print(f"  >>> OVER TRIGGER ({est:.0f}% >= {trig}%): run safe-harbor and wrap up.")
+    rows, worst = [], 0.0
+    for meter, points in cals.items():
+        if not points or meter not in acc:
+            continue
+        cal = points[-1]
+        factor = cal["reported_pct"] / cal["weighted"] if cal["weighted"] else 0
+        est = acc[meter]["weighted"] * factor
+        worst = max(worst, est)
+        rows.append((meter, est, cal["reported_pct"], cal["at"][:16], acc[meter]["stale"]))
+    print("safe-harbor estimate (per meter):")
+    for meter, est, calpct, at, stale in sorted(rows, key=lambda r: -r[1]):
+        flags = ("  <<< OVER" if est >= trig else "") + ("  [reset stale, recalibrate]" if stale else "")
+        print(f"  {meter:14} ~{est:5.0f}%   (calibrated {at} at {calpct}%){flags}")
+    if worst >= trig:
+        print(f">>> Tightest meter ~{worst:.0f}% (trigger {trig}%): run safe-harbor and wrap up.")
         return 2
-    print(f"  headroom: ~{trig - est:.0f} points before the trigger.")
+    print(f"Tightest meter ~{worst:.0f}%; ~{trig - worst:.0f} points of headroom.")
     return 0
 
 
@@ -185,16 +236,14 @@ def main():
     cfg = load_config()
     args = sys.argv[1:]
     if not args:
-        return cmd_estimate(cfg) if cfg["calibrations"] else (cmd_scan(cfg) and 0)
+        return cmd_estimate(cfg) if cfg.get("calibrations") else cmd_scan(cfg)
     cmd = args[0]
     if cmd == "scan":
-        cmd_scan(cfg)
-        return 0
-    if cmd == "calibrate":
-        if len(args) < 2:
-            print("Usage: usage.py calibrate <percent>")
-            return 1
-        return cmd_calibrate(cfg, args[1])
+        return cmd_scan(cfg)
+    if cmd == "set-reset" and len(args) >= 3:
+        return cmd_set_reset(cfg, args[1], args[2])
+    if cmd == "calibrate" and len(args) >= 3:
+        return cmd_calibrate(cfg, args[1], args[2])
     if cmd == "estimate":
         return cmd_estimate(cfg)
     print(__doc__)
