@@ -47,6 +47,15 @@ Two halves, both needed:
 - Size the fleet to the budget, not the budget to the fleet.
 - Keep units small and independent, so a cutoff is cheap and later merges stay clean.
 
+## Estimating your usage (optional helper)
+
+`scripts/usage.py` estimates how much of your weekly quota you have spent, so the skill can self-trigger instead of waiting for you to notice. It sums the token usage in your local Claude Code transcripts (`~/.claude/projects/**/*.jsonl`, sub-agent runs included) over a rolling window, weights it by model, and scales it against a calibration you take from the real `/usage` reading.
+
+- `python scripts/usage.py calibrate <percent>` once, when `/usage` shows a known figure. That fixes the tokens-to-percent scale for your plan.
+- `python scripts/usage.py estimate` any time after. It prints an estimated percent and exits non-zero once you cross the trigger, which is the cue to run the wrap-up procedure above.
+
+It only sees this machine's Claude Code usage, and the exact weighting toward the weekly limit is not public, so the number is a conservative early warning, not a precise gauge. Re-calibrate when your model mix shifts.
+
 ## Why not fully automatic
 
 A skill cannot watch your usage and pull the plug by itself. It is not a background daemon, and the weekly quota lives on the server with no reliable live read from inside a session. The substitute that works is the pairing above: checkpoint-safe work, so a cutoff is nearly free, plus a budget you set and this deliberate stop, so you choose the ceiling. That reaches the same outcome without depending on a watchdog that cannot exist.

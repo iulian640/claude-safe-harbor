@@ -8,6 +8,7 @@ SRC="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$DEST"
 cp "$SRC/SKILL.md" "$DEST/"
 cp -r "$SRC/references" "$DEST/"
+cp -r "$SRC/scripts" "$DEST/"
 
 echo "Installed Claude safe-harbor -> $DEST"
 echo "Invoke it in Claude Code with /safe-harbor, or just ask it to wrap up safely."

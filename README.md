@@ -66,6 +66,8 @@ Installing the skill gives Claude the procedure. It does not make Claude run it 
 
 For a mechanical backstop at session end, you can also wire a `Stop` hook that commits and pushes any dangling work. That is optional; the `CLAUDE.md` line plus a budget covers the common case.
 
+3. **Let it estimate its own usage (optional).** `scripts/usage.py` reads your local Claude Code transcripts, weights the tokens by model, and scales them against a calibration you take from the real `/usage` reading. Run `python scripts/usage.py calibrate <percent>` once, then `python scripts/usage.py estimate` any time to get a rough percent and a trigger signal. It only sees this machine and is a conservative early warning, not a precise gauge, but it lets the skill self-trigger instead of waiting for you to notice.
+
 ## Why it is not fully automatic
 
 A skill cannot watch your usage and pull the plug by itself. It is not a background process, and the weekly quota lives on the server with no reliable live read from inside a session. So `safe-harbor` runs on your signal or on a budget you set, not on a percentage watchdog. Paired with checkpoint-safe work, where a cutoff is nearly free anyway, it reaches the same result without depending on a watchdog that cannot exist.

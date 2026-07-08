@@ -66,6 +66,8 @@ Instalar la skill le da a Claude el procedimiento. No hace que lo ejecute solo. 
 
 Como red de seguridad mecánica al terminar la sesión, también puedes montar un hook `Stop` que haga commit y push de lo que quede suelto. Es opcional; la línea en `CLAUDE.md` más un presupuesto cubren el caso común.
 
+3. **Deja que estime su propio consumo (opcional).** `scripts/usage.py` lee tus transcripts locales de Claude Code, pondera los tokens por modelo y los escala contra una calibración que tomas de tu `/usage` real. Ejecuta `python scripts/usage.py calibrate <porcentaje>` una vez, y luego `python scripts/usage.py estimate` cuando quieras para tener un % aproximado y una señal de disparo. Solo ve esta máquina y es un aviso conservador, no un marcador exacto, pero permite que la skill se dispare sola en vez de esperar a que te des cuenta.
+
 ## Por qué no es totalmente automática
 
 Una skill no puede vigilar tu consumo y cortar la corriente sola. No es un proceso en segundo plano, y la cuota semanal vive en el servidor sin una lectura fiable en vivo desde dentro de una sesión. Así que `safe-harbor` se dispara con tu señal o con un presupuesto que tú marcas, no con un vigilante de porcentaje. Junto con un trabajo que va guardándose sobre la marcha, donde un corte casi no cuesta nada, llegas al mismo resultado sin depender de un vigilante que no puede existir.
