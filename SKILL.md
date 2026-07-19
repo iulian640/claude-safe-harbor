@@ -36,7 +36,7 @@ Two halves, both needed:
    - In-flight unit → save partial state: a WIP commit on its own branch, or a precise note of the file and the point where it stopped. Never leave uncommitted work as the only copy.
    - Data or corpus work → do not merge half-verified output; mark it partial and record what is left to check.
 4. **Write a HANDOFF doc** in a durable place (not a temp directory). Include: the current state, open PRs and their status, for each in-flight task where it stopped and the next concrete step, and the exact command to resume.
-5. **Persist memory.** If the session keeps long-term memory, record the checkpoint so the next session starts oriented instead of re-deriving everything.
+5. **Persist memory — only what passes the test.** Memory is not a log of what happened; it is what changes the next session's behavior. Before writing, ask: *would the next session do anything differently for knowing this?* A decision made, a state left pending, a trap discovered → save it. A session whose only fact is "this got done" → skip the write; the HANDOFF already covers resumption. Often the durable facts were saved *during* the work — then this step is a no-op, not a ritual.
 6. **Clean up**, but only after the work above is captured. Remove throwaway worktrees, stop background tasks, prune temp files.
 7. **Report.** A short summary: what landed, what is pending, and how to pick it up next time.
 
