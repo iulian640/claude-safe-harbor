@@ -23,11 +23,11 @@ When you run it, it:
 
 1. Stops launching new work.
 2. Takes inventory of what is done, in flight, and queued.
-3. Checkpoints everything: commit, push, and open a PR for finished work; save partial state for anything mid-flight.
+3. Checkpoints everything: commit and push finished work, or hand you the exact commands if you run git yourself; save partial state for anything mid-flight.
 4. Writes a `HANDOFF` doc in a durable place, with the current state, open PRs, where each in-flight task stopped, and the exact command to resume.
 5. Updates long-term memory if the session keeps any.
 6. Cleans up temp state and background tasks, but only after the work is captured.
-7. Reports what landed, what is pending, and how to pick it up.
+7. Ends with a fixed five-line close report: git state, HANDOFF path, memory, cleanup, and what is left for you. A skipped step is named, never silent.
 
 ## Install
 
@@ -40,12 +40,13 @@ cp claude-safe-harbor/SKILL.md ~/.claude/skills/safe-harbor/
 cp -r claude-safe-harbor/references ~/.claude/skills/safe-harbor/
 ```
 
-Or run `./install.sh` from the cloned repo.
+Or run `./install.sh` from the cloned repo. Add `--estimator` to also copy the optional usage estimator.
 
 ## Use
 
 Trigger it by asking, in whatever words fit:
 
+- "that's it for today, let's wrap up" (any language works: "cierro", "lo dejamos por hoy")
 - "wrap up safely, we're close to the limit"
 - "save progress before we run out"
 - `/safe-harbor`
@@ -66,7 +67,7 @@ Installing the skill gives Claude the procedure. It does not make Claude run it 
 
 For a mechanical backstop at session end, you can also wire a `Stop` hook that commits and pushes any dangling work. That is optional; the `CLAUDE.md` line plus a budget covers the common case.
 
-3. **Let it estimate its own usage (optional).** `scripts/usage.py` reads your local Claude Code transcripts and tracks each Claude limit separately: the ~5-hour session window and the weekly window. The session window is message-triggered (it starts with the first message after the previous one expired), so the tool reconstructs it from your timestamps with no reset needed; the weekly window is anchored to a reset you give it once. It weights the tokens by model, scales each meter against a calibration you take from the real `/usage` reading, and trips on whichever meter is closest to its cap. Set it up (`set-reset week` once, `calibrate session` and `calibrate week` with the numbers `/usage` shows), then `python scripts/usage.py estimate` any time for a per-meter percent and a trigger signal. It only sees this machine and is a conservative early warning, not a precise gauge, but the token counting is exact (it matches Claude Code's own accounting to the token), and it lets the skill self-trigger instead of waiting for you to notice.
+3. **Let it estimate its own usage (optional).** `scripts/usage.py` reads your local Claude Code transcripts, tracks the ~5-hour session meter and the weekly meter separately, and trips when either nears its cap. Setup and limits in [references/usage-estimator.md](references/usage-estimator.md). Install it with `./install.sh --estimator`.
 
 ## Why it is not fully automatic
 

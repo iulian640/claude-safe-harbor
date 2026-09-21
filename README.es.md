@@ -23,11 +23,11 @@ Cuando la ejecutas:
 
 1. Deja de lanzar trabajo nuevo.
 2. Hace inventario de lo hecho, lo que está en marcha y lo que está en cola.
-3. Guarda todo: commit, push y PR de lo terminado; estado parcial de lo que estaba a medias.
+3. Guarda todo: commit y push de lo terminado, o te pasa los comandos exactos si el git lo llevas tú; estado parcial de lo que estaba a medias.
 4. Escribe un documento `HANDOFF` en un sitio durable, con el estado actual, las PRs abiertas, dónde se paró cada tarea en marcha, y el comando exacto para retomar.
 5. Actualiza la memoria a largo plazo si la sesión tiene.
 6. Limpia el estado temporal y las tareas en segundo plano, pero solo después de haber guardado el trabajo.
-7. Reporta qué entró, qué queda y cómo seguir.
+7. Termina con un informe de cierre fijo de cinco líneas: estado de git, ruta del HANDOFF, memoria, limpieza y qué te queda a ti. Si se salta un paso, lo dice; nunca en silencio.
 
 ## Instalar
 
@@ -40,12 +40,13 @@ cp claude-safe-harbor/SKILL.md ~/.claude/skills/safe-harbor/
 cp -r claude-safe-harbor/references ~/.claude/skills/safe-harbor/
 ```
 
-O ejecuta `./install.sh` desde el repo clonado.
+O ejecuta `./install.sh` desde el repo clonado. Añade `--estimator` para copiar también el estimador de consumo opcional.
 
 ## Uso
 
 Actívala pidiéndolo, con las palabras que te salgan:
 
+- "lo dejamos por hoy", "cierro", "hasta aquí"
 - "cierra con cuidado, estamos cerca del límite"
 - "guarda el progreso antes de que se acabe"
 - `/safe-harbor`
@@ -66,7 +67,7 @@ Instalar la skill le da a Claude el procedimiento. No hace que lo ejecute solo. 
 
 Como red de seguridad mecánica al terminar la sesión, también puedes montar un hook `Stop` que haga commit y push de lo que quede suelto. Es opcional; la línea en `CLAUDE.md` más un presupuesto cubren el caso común.
 
-3. **Deja que estime su propio consumo (opcional).** `scripts/usage.py` lee tus transcripts locales de Claude Code y lleva cada límite por separado: la ventana de sesión de ~5h y la semanal. La de sesión se dispara con el mensaje (arranca con el primer mensaje tras expirar la anterior), así que la herramienta la reconstruye de tus timestamps sin que le des ningún reset; la semanal se ancla a un reset que le das una vez. Pondera los tokens por modelo, escala cada contador contra una calibración que tomas de tu `/usage` real, y salta por el contador que esté más cerca de su tope. Se configura (`set-reset week` una vez, `calibrate session` y `calibrate week` con los números que muestra `/usage`), y luego `python scripts/usage.py estimate` cuando quieras para un % por contador y una señal de disparo. Solo ve esta máquina y es un aviso conservador, no un marcador exacto, pero el conteo de tokens es exacto (cuadra al token con la contabilidad interna de Claude Code) y permite que la skill se dispare sola en vez de esperar a que te des cuenta.
+3. **Deja que estime su propio consumo (opcional).** `scripts/usage.py` lee tus transcripts locales de Claude Code, lleva por separado el contador de sesión (~5h) y el semanal, y salta cuando uno se acerca a su tope. Configuración y límites en [references/usage-estimator.md](references/usage-estimator.md). Se instala con `./install.sh --estimator`.
 
 ## Por qué no es totalmente automática
 
