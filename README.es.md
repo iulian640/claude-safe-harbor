@@ -27,7 +27,7 @@ Cuando la ejecutas:
 4. Escribe un documento `HANDOFF` en un sitio durable, con el estado actual, las PRs abiertas, dónde se paró cada tarea en marcha, y el comando exacto para retomar.
 5. Actualiza la memoria a largo plazo si la sesión tiene.
 6. Limpia el estado temporal y las tareas en segundo plano, pero solo después de haber guardado el trabajo.
-7. Termina con un informe de cierre fijo de cinco líneas: estado de git, ruta del HANDOFF, memoria, limpieza y qué te queda a ti. Si se salta un paso, lo dice; nunca en silencio.
+7. Termina con un informe de cierre fijo de cinco líneas, en tu idioma: estado de git, ruta del HANDOFF, memoria, limpieza y qué te queda a ti. Si se salta un paso, lo dice; nunca en silencio.
 
 ## Instalar
 

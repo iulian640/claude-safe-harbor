@@ -27,7 +27,7 @@ When you run it, it:
 4. Writes a `HANDOFF` doc in a durable place, with the current state, open PRs, where each in-flight task stopped, and the exact command to resume.
 5. Updates long-term memory if the session keeps any.
 6. Cleans up temp state and background tasks, but only after the work is captured.
-7. Ends with a fixed five-line close report: git state, HANDOFF path, memory, cleanup, and what is left for you. A skipped step is named, never silent.
+7. Ends with a fixed five-line close report, written in your language: git state, HANDOFF path, memory, cleanup, and what is left for you. A skipped step is named, never silent.
 
 ## Install
 

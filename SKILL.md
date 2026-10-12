@@ -17,6 +17,8 @@ You cannot read the live usage percentage from inside a session; it is enforced 
 
 ## The harbor procedure
 
+Everything this procedure writes for the user, the HANDOFF and the close report, goes in the language the user writes in, headings and labels included. The English templates are only templates.
+
 1. **Stop launching new work.** No new agents, no new long-running tasks.
 2. **Inventory.** What is done, what is in flight, what is queued. For a multi-agent run, which lanes finished and which were cut off. Check for uncommitted changes, open worktrees, background tasks, and temp files in the job directory.
 3. **Checkpoint everything.**
@@ -27,7 +29,7 @@ You cannot read the live usage percentage from inside a session; it is enforced 
 4. **Write or update the HANDOFF** in a durable place: the repo's docs, a documents folder, never a temp dir. Template in `references/handoff-template.md`. If the project already has a HANDOFF, append a dated close section instead of starting a new file.
 5. **Persist memory, only what passes the test.** Before writing, ask: would the next session do anything differently for knowing this? A decision, a pending state, a trap: save it. "This got done": skip it, the HANDOFF covers resumption. Often the durable facts were saved during the work; then this step is a no-op, and you say so in the report.
 6. **Clean up**, only after the work above is captured: throwaway worktrees, background tasks, temp files.
-7. **Close report.** Always end with this block, in the user's language, every line present. Write "nothing" when there is nothing; never drop a line.
+7. **Close report.** Always end with this block, every line present. Translate the title and the labels too: in Spanish they are `Cierre safe-harbor`, `Git`, `HANDOFF`, `Memoria`, `Limpieza`, `Para ti`. Never mix two languages in the block. Write "nothing", in the user's language, when there is nothing; never drop a line.
 
 ```
 safe-harbor close
