@@ -1,31 +1,26 @@
-# HANDOFF: <project> (<date>)
+# HANDOFF: <project>
 
 > Drop this in a durable place (the repo, a synced folder), never a temp dir.
-> Written when a session stops near a limit, so the next one resumes without re-deriving anything.
+> Write it in the user's language, headings included.
+> Resume from `Current state`. Each close rewrites it and moves the previous one verbatim to `<this file's name>-history.md`, next to this file. Nothing in the history file should be needed to pick up.
 
-## State in one line
-<e.g. "Audit done and merged; 3 of 5 feature lanes landed; 2 data lanes cut off mid-transcription.">
+## Current state (<date>)
 
-## Landed (in main / done)
-- #NNN <title>: merged
-- ...
+**In one line:** <e.g. "Login merged; invoices half done on feat/invoices, InvoiceServiceTest still red.">
 
-## Open PRs (need action)
-- #NNN <branch>: <CI status>. Left to do: <review / spot-check / merge>
-- ...
+### Done this session
+- <what landed, with branch or commit>
 
-## In flight when it stopped
-For each unit that was cut off:
-- **<name>**: stopped at `<file>:<point>`. Next step: <concrete action>. Work saved on branch `<branch>` (WIP commit <sha>), or discarded and needs a clean redo.
-- ...
+### Left half-way
+- **<task>**: stopped at `<file>:<point>`. Saved on `<branch>` (WIP commit <sha>), or not saved and needs a redo. Next step: <concrete action>.
 
-## Queued (not started)
-- <task>: <why it's next>
+### Next up
+- <task>: <why it goes first>
 
-## How to resume
+### How to resume
 ```
 <exact command(s) to pick up>
 ```
 
-## Decisions still open for the human
-- <decision>: <options>
+### Waiting on you or others
+- <decision, review or action>: <options, or who has it>

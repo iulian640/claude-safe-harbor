@@ -24,7 +24,7 @@ Cuando la ejecutas:
 1. Deja de lanzar trabajo nuevo.
 2. Hace inventario de lo hecho, lo que está en marcha y lo que está en cola.
 3. Guarda todo: commit y push de lo terminado, o te pasa los comandos exactos si el git lo llevas tú; estado parcial de lo que estaba a medias.
-4. Escribe un documento `HANDOFF` en un sitio durable, con el estado actual, las PRs abiertas, dónde se paró cada tarea en marcha, y el comando exacto para retomar.
+4. Escribe o actualiza un documento `HANDOFF` en un sitio durable. Arriba va el estado actual: lo hecho, dónde se paró cada tarea a medias, lo siguiente y el comando exacto para retomar. Cada cierre reescribe esa sección y pasa la anterior a un fichero de historial, así el HANDOFF sigue siendo lo bastante corto para leerlo de una vez.
 5. Actualiza la memoria a largo plazo si la sesión tiene.
 6. Limpia el estado temporal y las tareas en segundo plano, pero solo después de haber guardado el trabajo.
 7. Termina con un informe de cierre fijo de cinco líneas, en tu idioma: estado de git, ruta del HANDOFF, memoria, limpieza y qué te queda a ti. Si se salta un paso, lo dice; nunca en silencio.
