@@ -24,10 +24,10 @@ When you run it, it:
 1. Stops launching new work.
 2. Takes inventory of what is done, in flight, and queued.
 3. Checkpoints everything: commit and push finished work, or hand you the exact commands if you run git yourself; save partial state for anything mid-flight.
-4. Writes a `HANDOFF` doc in a durable place, with the current state, open PRs, where each in-flight task stopped, and the exact command to resume.
+4. Writes or updates a `HANDOFF` doc in a durable place. Its top section holds the current state: what got done, where each unfinished task stopped, what comes next, and the exact command to resume. Each close rewrites that section and moves the old one to a history file, so the HANDOFF stays short enough to read in one go.
 5. Updates long-term memory if the session keeps any.
 6. Cleans up temp state and background tasks, but only after the work is captured.
-7. Ends with a fixed five-line close report: git state, HANDOFF path, memory, cleanup, and what is left for you. A skipped step is named, never silent.
+7. Ends with a fixed five-line close report, written in your language: git state, HANDOFF path, memory, cleanup, and what is left for you. A skipped step is named, never silent.
 
 ## Install
 
